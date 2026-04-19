@@ -108,41 +108,40 @@ class Logger:
     
     def add_metrics(self, epoch, train_loss, val_loss, train_mae, val_mae, lr, epoch_time):
         """Добавляет метрики за эпоху"""
-        self.history['train_loss'].append(train_loss)
-        self.history['val_loss'].append(val_loss)
-        self.history['train_mae'].append(train_mae)
-        self.history['val_mae'].append(val_mae)
-        self.history['learning_rates'].append(lr)
-        self.history['epoch_times'].append(epoch_time)
-    
+        self.history['train_loss'].append(float(train_loss))  # Явное преобразование в float
+        self.history['val_loss'].append(float(val_loss))
+        self.history['train_mae'].append(float(train_mae))
+        self.history['val_mae'].append(float(val_mae))
+        self.history['learning_rates'].append(float(lr))
+        self.history['epoch_times'].append(float(epoch_time))
     
     def save(self, filename='training_history.json'):
         """Сохраняет историю обучения в JSON"""
         save_path = os.path.join(self.log_dir, filename)
         
-        # Преобразуем numpy типы в стандартные Python типы для JSON
+        # Преобразуем все numpy типы в стандартные Python типы для JSON
         def convert_to_serializable(obj):
-            if isinstance(obj, np.ndarray):
-                return obj.tolist()
+            if isinstance(obj, list):
+                return [convert_to_serializable(item) for item in obj]
+            elif isinstance(obj, dict):
+                return {key: convert_to_serializable(value) for key, value in obj.items()}
             elif isinstance(obj, (np.float32, np.float64)):
                 return float(obj)
             elif isinstance(obj, (np.int32, np.int64)):
                 return int(obj)
             elif isinstance(obj, torch.Tensor):
-                return obj.cpu().numpy().tolist()
+                return float(obj.cpu().item()) if obj.numel() == 1 else obj.cpu().numpy().tolist()
+            elif isinstance(obj, np.ndarray):
+                return obj.tolist()
             else:
                 return obj
         
         # Применяем преобразование к истории
-        serializable_history = {}
-        for key, value in self.history.items():
-            serializable_history[key] = convert_to_serializable(value)
+        serializable_history = convert_to_serializable(self.history)
         
-        with open(save_path, 'w') as f:
-            json.dump(serializable_history, f, indent=2)
+        with open(save_path, 'w', encoding='utf-8') as f:
+            json.dump(serializable_history, f, indent=2, ensure_ascii=False)
         print(f"История обучения сохранена в {save_path}")
-   
-    
     
     def get_best_epoch(self):
         """Возвращает номер эпохи с наименьшей val_loss"""
@@ -150,11 +149,11 @@ class Logger:
     
     def get_best_val_loss(self):
         """Возвращает наименьшую val_loss"""
-        return min(self.history['val_loss'])
+        return float(min(self.history['val_loss']))
     
     def get_best_val_mae(self):
         """Возвращает наименьшую val_mae"""
-        return min(self.history['val_mae'])
+        return float(min(self.history['val_mae']))
 
 
 def compute_metrics(predictions, targets):
@@ -214,6 +213,22 @@ def print_metrics(metrics, prefix=""):
 def save_config(config, save_path='config_saved.json'):
     """Сохраняет конфигурацию в JSON файл"""
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
-    with open(save_path, 'w') as f:
-        json.dump(config.to_dict(), f, indent=2, default=str)
+    
+    # Преобразуем значения в сериализуемый формат
+    config_dict = {}
+    for key, value in config.__dict__.items():
+        if not key.startswith('__') and not callable(value):
+            if isinstance(value, (np.float32, np.float64)):
+                config_dict[key] = float(value)
+            elif isinstance(value, (np.int32, np.int64)):
+                config_dict[key] = int(value)
+            elif isinstance(value, torch.device):
+                config_dict[key] = str(value)
+            elif isinstance(value, list):
+                config_dict[key] = [float(v) if isinstance(v, (np.float32, np.float64)) else v for v in value]
+            else:
+                config_dict[key] = value
+    
+    with open(save_path, 'w', encoding='utf-8') as f:
+        json.dump(config_dict, f, indent=2, default=str, ensure_ascii=False)
     print(f"Конфигурация сохранена в {save_path}")
