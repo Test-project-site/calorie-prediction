@@ -115,12 +115,34 @@ class Logger:
         self.history['learning_rates'].append(lr)
         self.history['epoch_times'].append(epoch_time)
     
+    
     def save(self, filename='training_history.json'):
         """Сохраняет историю обучения в JSON"""
         save_path = os.path.join(self.log_dir, filename)
+        
+        # Преобразуем numpy типы в стандартные Python типы для JSON
+        def convert_to_serializable(obj):
+            if isinstance(obj, np.ndarray):
+                return obj.tolist()
+            elif isinstance(obj, (np.float32, np.float64)):
+                return float(obj)
+            elif isinstance(obj, (np.int32, np.int64)):
+                return int(obj)
+            elif isinstance(obj, torch.Tensor):
+                return obj.cpu().numpy().tolist()
+            else:
+                return obj
+        
+        # Применяем преобразование к истории
+        serializable_history = {}
+        for key, value in self.history.items():
+            serializable_history[key] = convert_to_serializable(value)
+        
         with open(save_path, 'w') as f:
-            json.dump(self.history, f, indent=2)
+            json.dump(serializable_history, f, indent=2)
         print(f"История обучения сохранена в {save_path}")
+   
+    
     
     def get_best_epoch(self):
         """Возвращает номер эпохи с наименьшей val_loss"""
