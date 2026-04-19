@@ -1,22 +1,18 @@
-calorie-prediction/
-│
-├── data/                          # Папка с данными (можно .gitignore)
-│   ├── ingredients.csv
-│   ├── dish.csv
-│   └── images/                    # Папка с фотографиями
-│
-├── scripts/                       # Python файлы с кодом
-│   ├── dataset.py                 # Загрузчики данных
-│   ├── model.py                   # Архитектура нейросети
-│   ├── train.py                   # Функция обучения
-│   ├── utils.py                   # Вспомогательные функции
-│   └── config.py                  # Конфигурация
-│
-├── notebooks/                     # (или просто файл в корне)
-│   └── project_notebook.ipynb     # Jupyter с EDA и запуском
-│
-├── models/                        # Сохранённые модели
-│   └── best_model.pth
-│
-├── README.md                      # Описание проекта
-└── requirements.txt               # Зависимости
+# Предсказание калорийности блюд
+
+## Описание
+Нейросеть для оценки калорийности блюд по фотографии и ингредиентам.
+
+## Результаты
+- MAE на тесте: 
+- Использованная архитектура: ResNet18
+- Целевая метрика: MAE < 50
+
+## Запуск
+1. Установить зависимости: `pip install -r requirements.txt`
+2. Запустить ноутбук: `jupyter notebook project_notebook.ipynb`
+
+## Структура
+- `scripts/` - код для обучения и инференса
+- `notebooks/` - Jupyter с EDA и обучением
+- `models/` - сохранённые веса
