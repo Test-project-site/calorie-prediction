@@ -107,8 +107,8 @@ class Logger:
         os.makedirs(log_dir, exist_ok=True)
     
     def add_metrics(self, epoch, train_loss, val_loss, train_mae, val_mae, lr, epoch_time):
-        """Добавляет метрики за эпоху"""
-        self.history['train_loss'].append(float(train_loss))  # Явное преобразование в float
+        """Добавляет метрики за эпоху - явно преобразует в float"""
+        self.history['train_loss'].append(float(train_loss))
         self.history['val_loss'].append(float(val_loss))
         self.history['train_mae'].append(float(train_mae))
         self.history['val_mae'].append(float(val_mae))
@@ -119,28 +119,9 @@ class Logger:
         """Сохраняет историю обучения в JSON"""
         save_path = os.path.join(self.log_dir, filename)
         
-        # Преобразуем все numpy типы в стандартные Python типы для JSON
-        def convert_to_serializable(obj):
-            if isinstance(obj, list):
-                return [convert_to_serializable(item) for item in obj]
-            elif isinstance(obj, dict):
-                return {key: convert_to_serializable(value) for key, value in obj.items()}
-            elif isinstance(obj, (np.float32, np.float64)):
-                return float(obj)
-            elif isinstance(obj, (np.int32, np.int64)):
-                return int(obj)
-            elif isinstance(obj, torch.Tensor):
-                return float(obj.cpu().item()) if obj.numel() == 1 else obj.cpu().numpy().tolist()
-            elif isinstance(obj, np.ndarray):
-                return obj.tolist()
-            else:
-                return obj
-        
-        # Применяем преобразование к истории
-        serializable_history = convert_to_serializable(self.history)
-        
+        # Просто сохраняем - данные уже в float
         with open(save_path, 'w', encoding='utf-8') as f:
-            json.dump(serializable_history, f, indent=2, ensure_ascii=False)
+            json.dump(self.history, f, indent=2, ensure_ascii=False)
         print(f"История обучения сохранена в {save_path}")
     
     def get_best_epoch(self):
@@ -161,36 +142,35 @@ def compute_metrics(predictions, targets):
     Вычисляет метрики для регрессии.
     
     Args:
-        predictions: numpy array предсказаний
-        targets: numpy array истинных значений
+        predictions: list или array предсказаний
+        targets: list или array истинных значений
     
     Returns:
-        dict: словарь с метриками
+        dict: словарь с метриками (значения в float)
     """
-    predictions = np.array(predictions)
-    targets = np.array(targets)
+    predictions = np.array(predictions, dtype=np.float64)
+    targets = np.array(targets, dtype=np.float64)
     
     # MAE - Mean Absolute Error
-    mae = np.mean(np.abs(predictions - targets))
+    mae = float(np.mean(np.abs(predictions - targets)))
     
     # MSE - Mean Squared Error
-    mse = np.mean((predictions - targets) ** 2)
+    mse = float(np.mean((predictions - targets) ** 2))
     
     # RMSE - Root Mean Squared Error
-    rmse = np.sqrt(mse)
+    rmse = float(np.sqrt(mse))
     
     # MAPE - Mean Absolute Percentage Error
-    # Защита от деления на ноль
     mask = targets != 0
     if mask.sum() > 0:
-        mape = np.mean(np.abs((predictions[mask] - targets[mask]) / targets[mask])) * 100
+        mape = float(np.mean(np.abs((predictions[mask] - targets[mask]) / targets[mask])) * 100)
     else:
         mape = float('inf')
     
     # R² - Coefficient of Determination
     ss_res = np.sum((targets - predictions) ** 2)
     ss_tot = np.sum((targets - np.mean(targets)) ** 2)
-    r2 = 1 - (ss_res / (ss_tot + 1e-8))
+    r2 = float(1 - (ss_res / (ss_tot + 1e-8)))
     
     return {
         'mae': mae,
@@ -214,21 +194,18 @@ def save_config(config, save_path='config_saved.json'):
     """Сохраняет конфигурацию в JSON файл"""
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
     
-    # Преобразуем значения в сериализуемый формат
+    # Собираем только сериализуемые значения
     config_dict = {}
     for key, value in config.__dict__.items():
         if not key.startswith('__') and not callable(value):
-            if isinstance(value, (np.float32, np.float64)):
-                config_dict[key] = float(value)
-            elif isinstance(value, (np.int32, np.int64)):
-                config_dict[key] = int(value)
-            elif isinstance(value, torch.device):
-                config_dict[key] = str(value)
-            elif isinstance(value, list):
-                config_dict[key] = [float(v) if isinstance(v, (np.float32, np.float64)) else v for v in value]
-            else:
+            try:
+                # Пробуем сериализовать
+                json.dumps(value)
                 config_dict[key] = value
+            except (TypeError, OverflowError):
+                # Если не сериализуется, преобразуем в строку
+                config_dict[key] = str(value)
     
     with open(save_path, 'w', encoding='utf-8') as f:
-        json.dump(config_dict, f, indent=2, default=str, ensure_ascii=False)
+        json.dump(config_dict, f, indent=2, ensure_ascii=False)
     print(f"Конфигурация сохранена в {save_path}")
